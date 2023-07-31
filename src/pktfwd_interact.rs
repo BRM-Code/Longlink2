@@ -18,24 +18,28 @@ pub fn listen() { // TODO: Does this function block the port? is that a problem?
     let packet_id = &buffer[..4];
 
     // Organise the packet to process the data
-    sort_packet(packet_id, src_addr);
+    sort_packet(packet_id, src_addr, socket);
 
     // Collect the message from the packet and convert it to a string
     let message = String::from_utf8_lossy(&buffer[12..packet_size]).to_string();
     println!("Received message: {}", message);
 }
 
-fn sort_packet(packet_id: &[u8], src_addr: SocketAddr) {
+fn sort_packet(packet_id: &[u8], src_addr: SocketAddr, socket: UdpSocket) {
     let packet_type = packet_id[3];
+    let token = &packet_id[1..3];
+
+    println!("->[{:?}] Packet Signature", &packet_id[..4]);
+
     match packet_type {
         0x00 => { // PUSH_DATA Packet
-            ack_pktfwd(packet_id, 1, src_addr);
+            ack_pktfwd(token, 1, src_addr, socket);
         }
         0x02 => { // PULL_DATA Packet
-            ack_pktfwd(packet_id, 4, src_addr);
+            ack_pktfwd(token, 4, src_addr, socket);
         }
         0x05 => { // TX_ACK Packet
-            ack_pktfwd(packet_id, 5, src_addr);
+            ack_pktfwd(token, 5, src_addr, socket);
         }
         _ => { // UNKNOWN Packet
             println!("Unknown Packet! Packet ID: {:?}", packet_id);
@@ -43,11 +47,10 @@ fn sort_packet(packet_id: &[u8], src_addr: SocketAddr) {
     }
 }
 
-fn ack_pktfwd(token: &[u8], response_type: u8, src_addr: SocketAddr) {
-    println!("Acknowledging pk-fr on {:?}", src_addr);
-    let socket = UdpSocket::bind("0.0.0.0:0").expect("[ERROR] couldn't bind with pk-fr");
-    let message: &[u8; 4] = &[2, token[1], token[2], response_type];
-    socket.send_to(&message[..], src_addr).expect("[ERROR] couldn't acknowledge the pk-fr");
+fn ack_pktfwd(token: &[u8], response_type: u8, src_addr: SocketAddr, socket: UdpSocket) {
+    let message: &[u8; 4] = &[2, token[0], token[1], response_type];
+    socket.send_to(message, src_addr).expect("[ERROR] couldn't acknowledge the pk-fr");
+
+    // Print the message that is being sent
+    println!("<-[{:?}] Sending ACK packet to {}", message, src_addr);
 }
-
-
