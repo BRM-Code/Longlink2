@@ -1,8 +1,8 @@
 use std::net::{SocketAddr, UdpSocket};
-use std::ptr::null;
 use json::parse;
-use openssl::symm::{decrypt, Cipher};
-use base64::{Engine as _, alphabet, engine::{self, general_purpose}};
+use openssl::symm::{Cipher, Crypter, Mode};
+use base64::{Engine as _, engine::general_purpose};
+use crate::packet;
 
 
 const IP: &str = "127.0.0.1";
@@ -46,45 +46,34 @@ fn sort_packet(packet_id: &[u8], src_addr: SocketAddr, socket: UdpSocket, messag
     match packet_type {
         0x00 => { // PUSH_DATA Packet
             ack_pktfwd(token, 1, src_addr, socket);
+
             let parsed = parse(&message).unwrap();
-
-            if parsed.has_key("rxpk"){
-                let data = parsed["rxpk"][0]["data"].to_string();
-                let mut data_decoded = general_purpose::STANDARD.decode(data).unwrap();
-
-                //println!("data decoded: {:?}", std::str::from_utf8(&data_decoded).unwrap());
-
-                let uav_id = &data_decoded[1..3];
-                println!("UAV ID: {:?}", std::str::from_utf8(uav_id).unwrap());
-
-                let key = [0x2B, 0x7E, 0x15, 0x16, 0x28, 0xAE, 0xD2, 0xA6, 0xAB, 0xF7, 0x15, 0x88, 0x09, 0xCF, 0x4F, 0x3C];
-                let iv:[u8; 16] = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
-
-                let extra = data_decoded.drain(4..30);
-
-                println!("Decrypting {:?}", &extra);
-
-                let decrypted = decrypt(
-                    Cipher::aes_128_cbc(),
-                    &key,
-                    Some(&iv),
-                    (&extra).as_ref()
-                );
-                println!("Decrypted: {:?}", decrypted);
+            let contains_data = parsed.has_key("rxpk");
+            let contains_stats = parsed.has_key("stat");
+            if contains_data {
+                //packet::process_data_packet(parsed)
             }
-
-
-
+            if contains_stats {
+                println!("[PKFWD] Received stat packet");
+                // TODO: maybe check values received are healthy, temp etc
+            }
+            if !contains_data && !contains_stats {
+                println!("[PKFWD] Received PUSH_DATA packet -> JSON incorrect");
+            }
         }
         0x02 => { // PULL_DATA Packet
             ack_pktfwd(token, 4, src_addr, socket);
-
+            println!("[PKFWD] Received PULL_DATA packet -> Network route open");
+            /* TODO: this message can get annoying, maybe only message
+                when one of these packets haven't been received in a while */
         }
         0x05 => { // TX_ACK Packet
             ack_pktfwd(token, 5, src_addr, socket);
+            println!("[PKFWD] Received TX_ACK packet -> Packet sent successfully!");
         }
         _ => { // UNKNOWN Packet
-            println!("Unknown Packet! Packet ID: {:?}", packet_id);
+            println!("[PKFWD] Received Unknown packet Packet ID: {:?}", packet_id);
+            // TODO: maybe log these packets for analysis
         }
     }
 }
@@ -111,4 +100,19 @@ struct TelemetryData {
     heading: i16,
     arm: bool,
     sat_fix: bool,
+}
+
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ack_test() {
+        let result = 2 + 2;
+        assert_eq!(result, 4);
+    }
+    #[test]
+    fn ack_test2() {
+        let result = 2 + 2;
+        assert_eq!(result, 3);
+    }
 }
