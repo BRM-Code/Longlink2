@@ -1,7 +1,5 @@
 use std::net::{SocketAddr, UdpSocket};
 use json::parse;
-use openssl::symm::{Cipher, Crypter, Mode};
-use base64::{Engine as _, engine::general_purpose};
 use crate::packet;
 
 
@@ -47,11 +45,13 @@ fn sort_packet(packet_id: &[u8], src_addr: SocketAddr, socket: UdpSocket, messag
         0x00 => { // PUSH_DATA Packet
             ack_pktfwd(token, 1, src_addr, socket);
 
-            let parsed = parse(&message).unwrap();
+            let parsed = parse(&message).expect("[PKKFWD] JSON parse failed");
             let contains_data = parsed.has_key("rxpk");
             let contains_stats = parsed.has_key("stat");
+
             if contains_data {
-                //packet::process_data_packet(parsed)
+                // Extract the data from the packet and process it
+                let (telemetry, uav_id) = packet::process_data_packet(&parsed["rxpk"][0]["data"].to_string());
             }
             if contains_stats {
                 println!("[PKFWD] Received stat packet");
@@ -84,22 +84,6 @@ fn ack_pktfwd(token: &[u8], response_type: u8, src_addr: SocketAddr, socket: Udp
 
     // Print the message that is being sent
     println!("<-[{:?}] Sending ACK packet to {}", message, src_addr);
-}
-
-struct TelemetryData {
-    latitude: f32,
-    longitude: f32,
-    vbatt: f32,
-    altitude: u8,
-    ground_speed: u8,
-    satellites: u8,
-    consumption: u8,
-    rssi: u8,
-    pitch: i16,
-    roll: i16,
-    heading: i16,
-    arm: bool,
-    sat_fix: bool,
 }
 
 
