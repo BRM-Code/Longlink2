@@ -2,7 +2,7 @@ use std::str::from_utf8;
 use base64::Engine;
 use base64::engine::general_purpose;
 
-struct TelemetryData {
+pub struct TelemetryData {
     latitude: f32,
     longitude: f32,
     vbatt: f32,
@@ -19,10 +19,9 @@ struct TelemetryData {
 }
 
 // Takes Base64 encoded data packet and converts it to TelemetryData and extracts UAV_ID
-pub fn process_data_packet(parsed: &str) -> (&str, TelemetryData) {
-    let binding= general_purpose::STANDARD.decode(parsed).expect("Failed base64 decode");
-    let data_decoded= binding.as_slice();
-    let uav_id = from_utf8(&data_decoded[..2]).expect("Failed string conversion for UAV ID");
+pub fn process_data_packet(parsed: &str) -> (String, TelemetryData){
+    let data_decoded= general_purpose::STANDARD.decode(parsed).expect("Failed base64 decode");
+    let uav_id = from_utf8(&data_decoded[..2]).expect("Failed string conversion for UAV ID").to_string();
     let telemetry = TelemetryData{
         latitude: f32::from_le_bytes(<[u8; 4]>::try_from(data_decoded[2..6].to_vec()).expect("Lat unpack failed")),
         longitude: f32::from_le_bytes(<[u8; 4]>::try_from(data_decoded[6..10].to_vec()).expect("Long unpack failed")),
